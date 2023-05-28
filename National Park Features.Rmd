@@ -1,0 +1,381 @@
+---
+title: ""
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+```{r setup, include=FALSE}
+## Global options
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(here)
+library(ggplot2)
+library(reshape2)
+```
+
+```{r}
+trails <- read.csv(here("Data", "national_park_trails.csv"))
+```
+
+# Which of the top 10 most common features OR activities make trails in national parks most popular OR highest rated ?
+
+## Data Cleaning:
+
+```{r new_dataframe}
+trails1 <- trails %>% 
+  select(trail_id,name,area_name,city_name,state_name,popularity,avg_rating,features,activities ) %>% 
+  mutate(features = str_replace_all(features, "\\[|\\]", "")) %>% 
+  mutate(features = gsub("'", "", features)) %>% 
+  mutate(features = gsub(",", "", features)) %>% 
+  mutate(activities = str_replace_all(activities, "\\[|\\]", "")) %>% 
+  mutate(activities = gsub("'", "", activities)) %>% 
+  mutate(activities = gsub(",", "", activities)) 
+```
+
+To start off the analysis, a new data frame was created that was cleaned for features and activities columns. Brackets, quotes and commas were removed from values in the colums.
+
+## Most Common Features & Activities:
+
+```{r common_features}
+common_features = c()
+
+for (i in trails1$features){
+  common_features=c(common_features, as.list(el(strsplit(i, " "))))
+}
+common_features = paste(common_features, collapse = " ")
+
+common_features = sort(table(unlist(strsplit(common_features, " ") ) ),     
+               decreasing = TRUE)
+
+
+common_features <-as.data.frame(common_features)
+common_features
+```
+
+```{r common_activities}
+common_activities = c()
+
+for (i in trails1$activities){
+  common_activities=c(common_activities, as.list(el(strsplit(i, " "))))
+}
+common_activities = paste(common_activities, collapse = " ")
+
+common_activities = sort(table(unlist(strsplit(common_activities, " ") ) ),     
+               decreasing = TRUE)
+
+
+common_activities <-as.data.frame(common_activities)
+common_activities
+```
+
+Next, frequency analysis was conducted, to see which features and activities occurred most throughout the dataset. As shown by the lists, the most commonly occurring features were views, dogs-no and wildlife, and the most commonly occurring activities were hiking, nature-trips and birding.
+
+## Top 10 Most Common Features & Activities
+
+```{r top10_features}
+top10_features <- common_features %>% 
+  slice_max(order_by = Freq, n = 10)
+colnames(top10_features)[1] <- "Features"
+
+top10_features
+```
+
+```{r top10_activities}
+top10_activities <- common_activities %>% 
+  slice_max(order_by = Freq, n = 10)
+colnames(top10_activities)[1] <- "Activities"
+top10_activities
+```
+
+Next, we found out the top 10 most commonly occurring features and activities using slice_max.
+
+## Data Filtered for the 95th Quantile:
+
+```{r 95_quantile}
+trails2 <- trails1 %>% 
+  filter(popularity >= quantile(trails$popularity, probs = 0.95) & avg_rating >= quantile(trails$avg_rating, probs = 0.95))
+```
+
+Then, a new data frame was assigned that was filtered for popularity and avg_rating for 95th quantile. This provided us with the most popular and highest rated trails.
+
+## Frequency of Top 10 Most Common Features & Activities for the 95th Quantile:
+
+```{r 90_features}
+views <- sum(str_count(trails2$features, "views"))
+dogs_no <- sum(str_count(trails2$features, "dogs-no"))
+wildlife <- sum(str_count(trails2$features, "wildlife"))
+wild_flowers <- sum(str_count(trails2$features, "wild-flowers"))
+forest <- sum(str_count(trails2$features, "forest"))
+kids <- sum(str_count(trails2$features, "kids"))
+river <- sum(str_count(trails2$features, "river"))
+lake <- sum(str_count(trails2$features, "lake"))
+waterfall <- sum(str_count(trails2$features, "waterfall"))
+dogs_leash <- sum(str_count(trails2$features, "dogs-leash"))
+
+list_features <- c(views,dogs_no,wildlife,wild_flowers,forest,kids,river,lake,waterfall,dogs_leash)
+```
+
+```{r features_append}
+top10_features$Freq90 <- list_features
+```
+
+```{r 90_activities}
+hiking <- sum(str_count(trails2$activities, "hiking"))
+nature_trips <- sum(str_count(trails2$activities, "nature-trips"))
+birding <- sum(str_count(trails2$activities, "birding"))
+walking <- sum(str_count(trails2$activities, "walking"))
+trail_running <- sum(str_count(trails2$activities, "trail-running"))
+backpacking <- sum(str_count(trails2$activities, "backpacking"))
+camping <- sum(str_count(trails2$activities, "camping"))
+horseback_riding <- sum(str_count(trails2$activities, "horseback-riding"))
+fishing <- sum(str_count(trails2$activities, "fishing"))
+snowshoeing <- sum(str_count(trails2$activities, "snowshoeing"))
+
+
+list_activities <- c(hiking,nature_trips,birding,walking,trail_running,backpacking,camping,horseback_riding,fishing,snowshoeing)
+```
+
+```{r activities_append}
+top10_activities$Freq90 <- list_activities
+```
+
+Next, the frequency of the top 10 most common features and activities was calculated for the 95th percentile dataset, in order to see which features and activities were commonly occurring in trails with high popularity and avg_rating. These list were then appended to previously made date frames (top10), to be ready to plot.
+
+## Plots 1:
+
+```{r visualization}
+top10_features %>% 
+  ggplot(aes(x=Features, y= Freq90)) +
+  geom_col(fill = 'indianred2')+
+  theme(axis.text = element_text(angle = 90))+
+  labs(title = str_wrap("Features and popularity/avg_rating of trails for the 95th quantile via frequency of occurence ", 75))
+
+top10_activities %>% 
+  ggplot(aes(x=Activities, y= Freq90)) +
+  geom_col(fill='cornflowerblue')+
+  theme(axis.text = element_text(angle = 90))+
+  labs(title = str_wrap("Activities and popularity/avg_rating of trails for the 95th quantile via frequency of occurence ", 75))
+```
+
+As shown by the plots, it was evident that views, dogs-no and wildlife were the still the most commonly occurring features and hiking, nature trips and birding were still the most commonly occurring activities even at high popularity and high avg_rating trails (95th percentile).
+
+## Further Analysis- Summary Statistics:
+
+```{r means_views}
+trails3 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features == "views")
+mean_views <-mean(trails3$popularity)
+mean_views
+
+
+
+trails4 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features != "views")
+not_views <- mean(trails4$popularity) 
+not_views
+```
+
+```{r mean_dogs-no}
+trails3 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features == "dogs-no")
+mean_dogs_no <-mean(trails3$popularity)
+mean_dogs_no
+
+
+
+trails4 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features != "dogs-no")
+not_dogs_no <- mean(trails4$popularity) 
+not_dogs_no
+```
+
+```{r means_wildlife}
+trails3 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features == "wildlife")
+mean_wildlife <-mean(trails3$popularity)
+mean_wildlife
+
+
+
+trails4 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features != "wildlife")
+not_wildlife <- mean(trails4$popularity) 
+not_wildlife
+```
+
+```{r means_wild-flowers}
+trails3 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features == "wild-flowers")
+mean_wild_flowers <-mean(trails3$popularity)
+mean_views
+
+
+
+trails4 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features != "wild-flowers")
+not_wild_flowers <- mean(trails4$popularity) 
+not_wild_flowers
+```
+
+```{r means_forest}
+trails3 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features == "forest")
+mean_forest <-mean(trails3$popularity)
+mean_forest
+
+
+
+trails4 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features != "forest")
+not_forest <- mean(trails4$popularity) 
+not_forest
+```
+
+```{r means_kids}
+trails3 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features == "kids")
+mean_kids <-mean(trails3$popularity)
+mean_kids
+
+
+
+trails4 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features != "kids")
+not_kids <- mean(trails4$popularity) 
+not_kids
+```
+
+```{r means_river}
+trails3 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features == "river")
+mean_river <-mean(trails3$popularity)
+mean_river
+
+
+
+trails4 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features != "river")
+not_river <- mean(trails4$popularity) 
+not_river
+```
+
+```{r means_lake}
+trails3 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features == "lake")
+mean_lake <-mean(trails3$popularity)
+mean_lake
+
+
+
+trails4 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features != "lake")
+not_lake <- mean(trails4$popularity) 
+not_lake
+```
+
+```{r means_waterfall}
+trails3 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features == "waterfall")
+mean_waterfall <-mean(trails3$popularity)
+mean_waterfall
+
+
+
+trails4 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features != "waterfall")
+not_waterfall <- mean(trails4$popularity) 
+not_waterfall
+```
+
+```{r means_dogs-leash}
+trails3 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features == "dogs-leash")
+mean_dogs_leash <-mean(trails3$popularity)
+mean_dogs_leash
+
+
+
+trails4 <- trails1 %>%
+  separate_rows(features,sep = " ") %>% 
+  separate_rows(activities,sep = " ") %>% 
+  filter(features != "dogs-leash")
+not_dogs_leash <- mean(trails4$popularity) 
+not_dogs_leash
+```
+
+However, the goal of the report was not to find the most frequently occurring features and activities, but the features and activities that made trails in national parks most popular and highly rated. For this reason, further analysis was needed to be conducted using mean as the summary statistic. For the purpose of this report I chose to analyse features with popularity, but this analysis could be conducted for activities, avg_rating or any of those combinations too. In order to perform this analysis, the average of popularity was calculated for all trails, both, when a particular feature was present in the trails (mean_views) and when that particular feature was not present in the trails (not_views) for each of the top 10 most frequently occurring features. For example, with regards to the feature 'views', mean popularity was calculated for trails when these trails had the feature 'views and when they did not have the feature 'views'.
+
+```{r lists}
+mean_popularity <- c(mean_views,mean_dogs_no,mean_wildlife,mean_wild_flowers,mean_forest,mean_kids,mean_river,mean_lake,mean_waterfall,mean_dogs_leash)
+
+not_mean_popularity <- c(not_views,not_dogs_no,not_wildlife,not_wild_flowers,not_forest,not_kids,not_river,not_lake,not_waterfall,not_dogs_leash)
+```
+
+```{r mean_append}
+top10_features$mean_popularity <- mean_popularity
+top10_features$not_mean_popularity <- not_mean_popularity
+```
+
+These means were then combined into separate lists, to be added to the previous data frame (top10_features), in order to be ready to plot.
+
+## Plots 2:
+
+```{r visualization2}
+top10_features_longer <- top10_features %>% 
+  select(Features, mean_popularity, not_mean_popularity) %>% 
+  pivot_longer(mean_popularity:not_mean_popularity,
+               names_to = "Popularity",
+               values_to = "Mean")
+
+top10_features_longer %>% 
+  ggplot(aes(x=Features, y=Mean, fill=Popularity))+
+  geom_col(position='dodge', stat='identity')+
+  theme(axis.text = element_text(angle = 90))+
+  labs(title = str_wrap("Relationship between most common Features and mean Popularity for Trails in National Parks ", 45))
+
+```
+
+As shown by the column graph, the feature that made the trails in the national parks most popular was actually the presence of a waterfall, since it provided the highest popularity mean (13.37) out of all the top 10 most commonly occurring features. This was different to the top 10 most commonly occurring features in the 95th quantile dataset because features such as views (9.62/10.58), dogs-no (10.10/10.46) and wildlife (10.29/10.43) were frequent in both high popularity trails and low popularity trails as shown by the blue bars (not_mean_popularity) which indicate mean popularity when these features were not present in the trails. Moreover, the fact that mean popularity is higher with the presence of waterfalls (13.37) than without their presence (10.30) indicates that it is the best feature within top 10 most common features that makes trails in national parks most popular.
